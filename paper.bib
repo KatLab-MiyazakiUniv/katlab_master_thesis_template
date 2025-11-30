@@ -1,0 +1,80 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BibTeX ファイルの書き方
+%
+% 文献の種類によって、使用するエントリタイプと必須フィールドが異なる
+% 主なエントリタイプ：
+%   article      : 学術論文（journal, volume, number, pages などが必要）
+%   book         : 書籍（publisher, year などが必要）
+%   inproceedings: 会議論文（booktitle, pages などが必要）
+%   misc         : その他（Web サイトなど、howpublished を使用）
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%学術論文等
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@article{hirakoba,
+  author  = {平木場風太 and 片山徹郎},
+  title   = {{VDM}++仕様を対象としたテストケース自動生成ツール{BWDM}へのドメイン分析テストの適用},
+  journal = {ソフトウェアエンジニアリングシンポジウム 2019 論文集},
+  pages   = {126-134},
+  year    = {2019}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%書籍
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@book{kimura-latex,
+  author    = {木村優哉},
+  title     = {実践LaTeX論文執筆入門},
+  publisher = {技術評論社},
+  year      = {2023},
+  edition   = {第2版}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Web
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+@misc{vdmj,
+  author       = {nickbattle},
+  title        = {{VDMJ}},
+  howpublished = {\url{https://github.com/nickbattle/vdmj}},
+  note         = {Accessed: 2020-1-18}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 学術論文（ジャーナル）の例
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@article{kimura-docker,
+  author  = {木村優哉 and 片山徹郎},
+  title   = {Dockerを用いた再現可能な研究環境の構築手法},
+  journal = {情報処理学会論文誌},
+  volume  = {64},
+  number  = {11},
+  pages   = {1850-1862},
+  year    = {2023}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 会議論文の例
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@inproceedings{kimura-automation,
+  author    = {木村優哉},
+  title     = {LaTeX文書の自動コンパイルシステムの設計と実装},
+  booktitle = {第30回ソフトウェア工学の基礎ワークショップ (FOSE2023)},
+  pages     = {123-128},
+  year      = {2023},
+  publisher = {日本ソフトウェア科学会}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Webサイトの例
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@misc{kimura-github,
+  author       = {木村優哉},
+  title        = {KatLab Master Thesis Template},
+  howpublished = {\url{https://github.com/kimura/thesis-template}},
+  note         = {Accessed: 2024-11-20}
+}
