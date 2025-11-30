@@ -53,7 +53,7 @@ WATCH_CMD       = $(DOCKER_PREFIX) bash -c "sed -i 's/\r$$//' /workspace/scripts
 PAPER_LATEXMK_CMD = TEXINPUTS=./chapters//:./packages//: LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 PATH=/usr/local/bin/texlive:$$PATH latexmk -pdfdvi -jobname=paper -output-directory=build -interaction=nonstopmode paper.tex
 
 # paper.texをPDFにコンパイル
-paper.pdf: paper.tex $(CHAPTER_TEX_FILES)
+paper.pdf: paper.tex $(CHAPTER_TEX_FILES) paper.bib
 	@mkdir -p build
 	@echo "paper.texをコンパイル中..."
 ifeq ($(IN_DEVCONTAINER),1)
@@ -129,27 +129,27 @@ watch: ## ファイル変更を監視してコンパイル（全環境対応）
 watch-chapters: ## chapters内のファイル変更を監視してpaper.texをコンパイル
 	$(call kill_existing_make_processes)
 	@mkdir -p build
-	@echo "watching: chapters/**/*.tex, paper.tex"
+	@echo "watching: chapters/**/*.tex, paper.tex, paper.bib"
 	@trap 'rm -f .make.pid; exit' INT TERM; \
 	if command -v fswatch > /dev/null 2>&1; then \
-		fswatch -o chapters paper.tex | while read; do \
+		fswatch -o chapters paper.tex paper.bib | while read; do \
 			echo "ファイル変更を検知しました。コンパイルを開始します..."; \
 			$(MAKE) paper.pdf || echo "[ERROR] コンパイルに失敗しました"; \
 		done; \
 	elif command -v inotifywait > /dev/null 2>&1; then \
-		while inotifywait -e modify,create,delete -r chapters paper.tex 2>/dev/null; do \
+		while inotifywait -e modify,create,delete -r chapters paper.tex paper.bib 2>/dev/null; do \
 			echo "ファイル変更を検知しました。コンパイルを開始します..."; \
 			$(MAKE) paper.pdf || echo "[ERROR] コンパイルに失敗しました"; \
 		done; \
 	else \
-		last_time=$$(find chapters paper.tex -type f -name "*.tex" 2>/dev/null | \
+		last_time=$$(find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
 			xargs stat -f "%m" 2>/dev/null | sort -n | tail -1 || \
-			find chapters paper.tex -type f -name "*.tex" 2>/dev/null | \
+			find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
 			xargs stat -c "%Y" 2>/dev/null | sort -n | tail -1 || echo 0); \
 		while true; do \
-			current_time=$$(find chapters paper.tex -type f -name "*.tex" 2>/dev/null | \
+			current_time=$$(find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
 				xargs stat -f "%m" 2>/dev/null | sort -n | tail -1 || \
-				find chapters paper.tex -type f -name "*.tex" 2>/dev/null | \
+				find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
 				xargs stat -c "%Y" 2>/dev/null | sort -n | tail -1 || echo 0); \
 			if [ "$$current_time" != "$$last_time" ]; then \
 				echo "ファイル変更を検知しました。コンパイルを開始します..."; \
