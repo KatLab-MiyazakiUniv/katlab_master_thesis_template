@@ -1,0 +1,72 @@
+\chapter{考察}\label{cha:Evaluation}
+
+本章では、論文執筆における章立てとセクション構成について説明する。
+
+\section{章の構成}
+
+論文は複数の章で構成される。各章は \verb|\chapter{}| コマンドで定義する。
+
+\subsection{章番号の自動付与}
+
+LaTeX では章番号が自動的に付与される。
+例えば、本章は第\ref{cha:Evaluation}章である。
+
+\subsection{章のラベル付け}
+
+各章には \verb|\label{}| を付けることで、他の箇所から参照できる。
+これにより、章番号が変更されても参照が自動的に更新される。
+
+\section{セクションの構成}
+
+各章は複数のセクションで構成される。
+
+\subsection{セクションの階層}
+
+LaTeX では以下の階層構造が使用できる：
+
+\begin{enumerate}
+  \item \verb|\chapter{}|: 章
+  \item \verb|\section{}|: 節
+  \item \verb|\subsection{}|: 小節
+  \item \verb|\subsubsection{}|: 小小節
+\end{enumerate}
+
+\subsection{適切な階層の選択}
+
+論文の構成を考える際は、以下の点に注意する：
+
+\begin{itemize}
+  \item 階層が深くなりすぎないようにする（通常は subsection まで）
+  \item 各セクションには適切な量の内容を含める
+  \item セクションの粒度を統一する
+\end{itemize}
+
+\section{論文の一般的な構成}
+
+修士論文の一般的な構成は以下の通りである：
+
+\begin{enumerate}
+  \item はじめに
+  \item 研究の準備（背景、関連研究）
+  \item 提案手法・システムの機能
+  \item 実装
+  \item 評価・適用例
+  \item 考察
+  \item おわりに（まとめと今後の課題）
+\end{enumerate}
+
+\section{本テンプレートの構成}
+
+本テンプレートでは、以下の構成でサンプルを提供している：
+
+\begin{itemize}
+  \item 第\ref{cha:Introduction}章: テンプレートの使い方
+  \item 第\ref{cha:Preparation}章: 基本的な LaTeX の書き方
+  \item 第\ref{cha:Function}章: 図、表、数式の挿入方法
+  \item 第\ref{cha:Implementation}章: ソースコードの挿入方法
+  \item 第\ref{cha:Indication}章: 参考文献の引用方法
+  \item 第\ref{cha:Evaluation}章: 章立てとセクション構成
+  \item 第\ref{cha:Conclusion}章: まとめ
+\end{itemize}
+
+実際の論文執筆時は、各章の内容を自分の研究内容に置き換えて使用する。
