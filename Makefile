@@ -4,12 +4,14 @@
 MAIN_TEX = paper.tex
 OUTPUT_PDF = paper.pdf
 
-# プロセス管理関数
-define kill_existing_make_processes
-	@echo "既存のmakeプロセスをチェック中..."
+# プロセス管理関数 - 既存の監視プロセスのみを終了（自分自身は除外）
+define kill_watch_processes
+	@echo "既存の監視プロセスをチェック中..."
+	@$(DOCKER_PREFIX) pkill -f "watch.sh" 2>/dev/null || true
 	@if [ -f .make.pid ]; then \
 		old_pid=$$(cat .make.pid); \
-		if kill -0 $$old_pid 2>/dev/null; then \
+		current_pid=$$$$; \
+		if [ "$$old_pid" != "$$current_pid" ] && kill -0 $$old_pid 2>/dev/null; then \
 			echo "既存のmakeプロセス(PID: $$old_pid)を終了中..."; \
 			kill $$old_pid 2>/dev/null || true; \
 			sleep 1; \
@@ -18,7 +20,10 @@ define kill_existing_make_processes
 		fi; \
 		rm -f .make.pid; \
 	fi
-	@$(DOCKER_PREFIX) pkill -f "watch.sh" 2>/dev/null || echo "Docker内のwatchプロセスを終了しました"
+endef
+
+# PIDを記録する関数
+define save_pid
 	@echo $$$$ > .make.pid
 endef
 
@@ -42,10 +47,17 @@ LATEX_CLEAN     = $(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && latexmk -c -o
 LATEX_CLEAN_ALL = $(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && latexmk -C -outdir=build $(MAIN_TEX)"
 
 # ファイル監視スクリプト（全環境対応）
-WATCH_CMD       = $(DOCKER_PREFIX) bash -c "sed -i 's/\r$$//' $(WORKSPACE_DIR)/scripts/watch.sh && bash $(WORKSPACE_DIR)/scripts/watch.sh"
+WATCH_CMD       = $(DOCKER_PREFIX) bash $(WORKSPACE_DIR)/scripts/watch.sh
 
 # デフォルトターゲット - paper.pdf をコンパイル後、chapters/ を監視
-all: paper.pdf watch-chapters
+all: ## paper.tex をコンパイル後、chapters/ を監視
+	$(call kill_watch_processes)
+	@$(MAKE) paper.pdf
+	@echo ""
+	@echo "初回コンパイル完了。監視モードを開始します..."
+	@echo "終了するには Ctrl+C を押してください"
+	@echo ""
+	@$(MAKE) watch-chapters
 
 .DEFAULT_GOAL := all
 
@@ -53,8 +65,8 @@ help: ## ヘルプを表示
 	@echo "利用可能なコマンド:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-kill-make: ## 既存のmakeプロセスを強制終了
-	$(call kill_existing_make_processes)
+kill-make: ## 既存の監視プロセスを強制終了
+	$(call kill_watch_processes)
 
 # LaTeX 関連コマンド
 paper.pdf: ## paper.tex をコンパイルし、paper.pdf を生成
@@ -64,8 +76,8 @@ paper.pdf: ## paper.tex をコンパイルし、paper.pdf を生成
 	@$(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && if [ -f build/$(OUTPUT_PDF) ]; then cp build/$(OUTPUT_PDF) $(OUTPUT_PDF) && echo 'PDF copied to root: $(OUTPUT_PDF)'; fi"
 
 watch-chapters: ## chapters/ 内のファイル変更を監視してコンパイル
-	$(call kill_existing_make_processes)
 	@mkdir -p build
+	$(call save_pid)
 	@echo "watching: chapters/**/*.tex (auto-detecting best method for your environment)"
 	@trap 'rm -f .make.pid; exit' INT TERM; $(WATCH_CMD)
 
