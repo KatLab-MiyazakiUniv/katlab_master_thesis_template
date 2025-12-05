@@ -51,6 +51,27 @@ make restart  # Restart container
 make rebuild  # Complete rebuild
 ```
 
+### Template Synchronization
+
+This repository serves as a template. Repositories created from this template can sync updates using:
+
+```bash
+bash scripts/sync-template.sh
+```
+
+The script:
+1. Fetches latest changes from the template repository
+2. Shows differences between template and current repo
+3. Offers merge/rebase options to incorporate updates
+4. Handles conflicts if they occur
+
+**Manual sync method:**
+```bash
+git remote add template https://github.com/KatLab-MiyazakiUniv/katlab_master_thesis_template.git
+git fetch template
+git merge template/main --allow-unrelated-histories
+```
+
 ## Architecture
 
 ### LaTeX Compilation Pipeline
@@ -83,6 +104,9 @@ packages/               # Custom LaTeX style files
   listings.sty          # Code listing support
 images/                 # Image files referenced in thesis
 build/                  # Compilation artifacts (.aux, .dvi, .log, etc.)
+scripts/                # Utility scripts
+  watch.sh              # File watching script (used by Makefile)
+  sync-template.sh      # Template synchronization script
 ```
 
 ### Execution Environment Detection
@@ -121,3 +145,27 @@ The `languages.sty` file provides syntax highlighting configurations for:
 - The environment uses UTF-8 encoding with Japanese locale (ja_JP.UTF-8)
 - When editing LaTeX: preserve indentation and line structure for proper compilation
 - The Docker image is based on `paperist/texlive-ja:latest` with additional packages (algorithms, algorithmicx)
+
+## Template Maintenance
+
+### PID File Management
+
+The project uses PID files to manage watch processes and prevent multiple simultaneous instances:
+
+- `.watch.pid` - Tracks the watch.sh process (created by scripts/watch.sh)
+- `.make.pid` - Reserved for future use (currently unused)
+
+Both files are:
+- Automatically created/deleted by their respective processes
+- Excluded from version control (.gitignore)
+- Used to ensure only one watch process runs at a time
+
+### Process Management
+
+When `make` is executed:
+1. `kill_watch_processes` checks for existing `.watch.pid`
+2. If found, terminates the old watch process gracefully
+3. New watch process starts and writes its PID to `.watch.pid`
+4. On exit (Ctrl+C), the PID file is automatically cleaned up
+
+This prevents "Terminated" errors and ensures clean single-process operation.

@@ -20,4 +20,4 @@ build/
 .DS_Store
 
 # プロセス管理ファイル
-.make.pid
+.watch.pid

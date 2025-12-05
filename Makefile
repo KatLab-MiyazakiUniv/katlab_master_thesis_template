@@ -1,284 +1,153 @@
-.PHONY: help build up down exec clean compile watch watch-chapters pdf stop logs kill-make
+.PHONY: help build up down exec clean clean-all watch-chapters open-pdf setup dev restart rebuild stop logs paper.pdf kill-make
 
-# TeXファイルのリストを取得（サブディレクトリも含む）
-TEX_FILES := $(shell if [ -d src ]; then find src -name "*.tex" -type f; fi)
-PDF_FILES := $(patsubst src/%.tex,pdf/%.pdf,$(TEX_FILES))
+# メインTeXファイル
+MAIN_TEX = paper.tex
+OUTPUT_PDF = paper.pdf
 
-# chaptersディレクトリ内の.texファイルのリスト
-CHAPTER_TEX_FILES := $(shell find chapters -name "*.tex" -type f)
-
-# プロセス管理関数
-define kill_existing_make_processes
-	@echo "既存のmakeプロセスをチェック中..."
-	@if [ -f .make.pid ]; then \
-		old_pid=$$(cat .make.pid); \
-		if kill -0 $$old_pid 2>/dev/null; then \
-			echo "既存のmakeプロセス(PID: $$old_pid)を終了中..."; \
-			kill $$old_pid 2>/dev/null || true; \
-			sleep 1; \
-			kill -9 $$old_pid 2>/dev/null || true; \
-			echo "既存のプロセスを終了しました"; \
+# 既存の監視スクリプトのみを終了（PIDファイルベース）
+define kill_watch_processes
+	@echo "既存の監視プロセスをチェック中..."
+	@if [ "$(IN_DEVCONTAINER)" = "1" ]; then \
+		if [ -f .watch.pid ]; then \
+			OLD_PID=$$(cat .watch.pid 2>/dev/null); \
+			if [ -n "$$OLD_PID" ] && kill -0 $$OLD_PID 2>/dev/null; then \
+				echo "監視プロセス (PID: $$OLD_PID) を終了します..."; \
+				kill $$OLD_PID 2>/dev/null || true; \
+				sleep 0.5; \
+			fi; \
+			rm -f .watch.pid; \
 		fi; \
-		rm -f .make.pid; \
+	else \
+		$(DOCKER_PREFIX) bash -c '\
+			if [ -f /workspace/.watch.pid ]; then \
+				OLD_PID=$$(cat /workspace/.watch.pid 2>/dev/null); \
+				if [ -n "$$OLD_PID" ] && kill -0 $$OLD_PID 2>/dev/null; then \
+					echo "監視プロセス (PID: $$OLD_PID) を終了します..."; \
+					kill $$OLD_PID 2>/dev/null || true; \
+					sleep 0.5; \
+				fi; \
+				rm -f /workspace/.watch.pid; \
+			fi'; \
 	fi
-	@$(DOCKER_PREFIX) pkill -f "watch.sh" 2>/dev/null || echo "Docker内のwatchプロセスを終了しました"
-	@echo $$$$ > .make.pid
 endef
 
 # 実行環境の判定
-IN_DEVCONTAINER := $(shell test -f /.dockerenv && test -f /workspace/.devcontainer/devcontainer.json && echo 1 || echo 0)
+IN_DEVCONTAINER := $(shell test -f /.dockerenv && test -f .devcontainer/devcontainer.json && echo 1 || echo 0)
 
 # 環境に応じたコマンドの定義
 ifeq ($(IN_DEVCONTAINER),1)
     # Dev Container 内での実行コマンド
     DOCKER_PREFIX =
-    CD_PREFIX = cd /workspace &&
+    WORKSPACE_DIR = .
 else
     # Docker Compose 経由での実行コマンド
     DOCKER_PREFIX = docker compose exec -T latex
-    CD_PREFIX = bash -c cd /workspace &&
+    WORKSPACE_DIR = /workspace
 endif
 
 # 共通のコマンドを定義
-LATEX_CMD       = $(DOCKER_PREFIX) $(CD_PREFIX) TEXINPUTS=./src//: LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 latexmk -pdfdvi
-LATEX_CLEAN     = $(DOCKER_PREFIX) $(CD_PREFIX) latexmk -c
-LATEX_CLEAN_ALL = $(DOCKER_PREFIX) $(CD_PREFIX) latexmk -C
-CP_CMD          = $(DOCKER_PREFIX) $(CD_PREFIX) cp
-RM_CMD          = $(DOCKER_PREFIX) $(CD_PREFIX) rm -rf
+LATEX_CMD       = $(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 latexmk -pdfdvi -outdir=build $(MAIN_TEX)"
+LATEX_CLEAN     = $(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && latexmk -c -outdir=build $(MAIN_TEX)"
+LATEX_CLEAN_ALL = $(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && latexmk -C -outdir=build $(MAIN_TEX)"
 
 # ファイル監視スクリプト（全環境対応）
-WATCH_CMD       = $(DOCKER_PREFIX) bash -c "sed -i 's/\r$$//' /workspace/scripts/watch.sh && bash /workspace/scripts/watch.sh"
+WATCH_CMD       = $(DOCKER_PREFIX) bash $(WORKSPACE_DIR)/scripts/watch.sh
 
-# paper.tex 用の latexmk コマンド
-PAPER_LATEXMK_CMD = TEXINPUTS=./chapters//:./packages//: LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 PATH=/usr/local/bin/texlive:$$PATH latexmk -pdfdvi -jobname=paper -output-directory=build -interaction=nonstopmode paper.tex
-
-# paper.texをPDFにコンパイル
-paper.pdf: paper.tex $(CHAPTER_TEX_FILES) paper.bib
+# デフォルトターゲット - paper.pdf をコンパイル後、chapters/ を監視
+all: ## paper.tex をコンパイル後、chapters/ を監視
+	$(call kill_watch_processes)
 	@mkdir -p build
-	@echo "paper.texをコンパイル中..."
-ifeq ($(IN_DEVCONTAINER),1)
-	@$(PAPER_LATEXMK_CMD)
-else
-	@$(DOCKER_PREFIX) bash -lc "cd /workspace && $(PAPER_LATEXMK_CMD)"
-endif
-	@if [ ! -f build/paper.pdf ]; then \
-		echo "[ERROR] PDFの作成に失敗しました。build/paper.pdf が見つかりません。"; \
-		exit 1; \
-	fi
-	@cp build/paper.pdf paper.pdf
-	@echo "PDFを作成しました: paper.pdf"
+	@echo "Compiling $(MAIN_TEX)..."
+	@$(LATEX_CMD)
+	@$(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && if [ -f build/$(OUTPUT_PDF) ]; then cp build/$(OUTPUT_PDF) $(OUTPUT_PDF) && echo 'PDF copied to root: $(OUTPUT_PDF)'; fi"
+	@echo ""
+	@echo "初回コンパイル完了。監視モードを開始します..."
+	@echo "終了するには Ctrl+C を押してください"
+	@echo ""
+	@echo "watching: chapters/**/*.tex (auto-detecting best method for your environment)"
+	@$(WATCH_CMD)
 
-# デフォルトターゲット - 初回コンパイル後、自動監視開始
-all: ## paper.texをPDFに変換し、chapters内のファイル変更を監視
-	$(call kill_existing_make_processes)
-	@$(MAKE) paper.pdf
-	@$(MAKE) watch-chapters
-
-# 初回コンパイル（監視なし）
-compile-all: $(PDF_FILES) ## すべての TeX ファイルを PDF に変換（監視なし）
-	@if [ -n "$(TEX_FILES)" ]; then \
-		echo "初回コンパイル完了。"; \
-	else \
-		echo "[WARNING] src/ ディレクトリに .tex ファイルが見つかりません。"; \
-		exit 1; \
-	fi
-
-# デフォルト：paper.texをコンパイル後、chapters内のファイル変更を監視
-default: ## paper.texをコンパイル後、chapters内のファイル変更を監視
-	$(call kill_existing_make_processes)
-	@$(MAKE) paper.pdf
-	@$(MAKE) watch-chapters
-
-.DEFAULT_GOAL := default
+.DEFAULT_GOAL := all
 
 help: ## ヘルプを表示
 	@echo "利用可能なコマンド:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-kill-make: ## 既存のmakeプロセスを強制終了
-	$(call kill_existing_make_processes)
-
-# ファイル別の PDF ビルドルール
-pdf/%.pdf: src/%.tex
-	@mkdir -p pdf build $(dir $@)
-	@echo "ファイルをコンパイル: $<"
-	@$(DOCKER_PREFIX) bash -c "cd /workspace && TEXINPUTS=./src//: latexmk -pdfdvi $<" || true
-	@$(CP_CMD) build/$(notdir $(basename $<)).pdf $@ || true
+kill-make: ## 既存の監視プロセスを強制終了
+	$(call kill_watch_processes)
 
 # LaTeX 関連コマンド
-compile: ## src 下の .tex ファイルをコンパイル
-	@mkdir -p pdf build
-	@for tex in $(TEX_FILES); do \
-		echo "コンパイル: $$tex"; \
-		rel_path=$$(echo "$$tex" | sed 's|^src/||'); \
-		pdf_dir=pdf/$$(dirname "$$rel_path"); \
-		mkdir -p "$$pdf_dir"; \
-		$(DOCKER_PREFIX) bash -c "cd /workspace && TEXINPUTS=./src//: latexmk -pdfdvi $$tex" || true; \
-		pdf_name=$$(echo "$$rel_path" | sed 's/\.tex$$/\.pdf/'); \
-		$(CP_CMD) build/$$(basename $${tex%.tex}).pdf "pdf/$$pdf_name" || true; \
-	done
-	@echo "コンパイル完了"
-
-watch: ## ファイル変更を監視してコンパイル（全環境対応）
-	$(call kill_existing_make_processes)
-	@mkdir -p pdf build
-	@echo "watching: src/**/*.tex (auto-detecting best method for your environment)"
-	@trap 'rm -f .make.pid; exit' INT TERM; $(WATCH_CMD)
-
-# chapters内のファイル変更を監視してpaper.texをコンパイル
-watch-chapters: ## chapters内のファイル変更を監視してpaper.texをコンパイル
-	$(call kill_existing_make_processes)
+paper.pdf: ## paper.tex をコンパイルし、paper.pdf を生成
 	@mkdir -p build
-	@echo "watching: chapters/**/*.tex, paper.tex, paper.bib"
-	@trap 'rm -f .make.pid; exit' INT TERM; \
-	if command -v fswatch > /dev/null 2>&1; then \
-		fswatch -o chapters paper.tex paper.bib | while read; do \
-			echo "ファイル変更を検知しました。コンパイルを開始します..."; \
-			retry_count=0; \
-			while [ $$retry_count -lt 3 ]; do \
-				if $(MAKE) paper.pdf; then \
-					echo "コンパイルに成功しました"; \
-					break; \
-				else \
-					retry_count=$$((retry_count + 1)); \
-					echo "[ERROR] コンパイルに失敗しました (試行 $$retry_count/3)"; \
-					if [ $$retry_count -lt 3 ]; then \
-						echo "クリーンアップして再試行します..."; \
-						$(MAKE) clean-all; \
-						sleep 1; \
-					else \
-						echo "[ERROR] 3回試行しましたが失敗しました。ファイル監視を継続します。"; \
-					fi; \
-				fi; \
-			done; \
-		done; \
-	elif command -v inotifywait > /dev/null 2>&1; then \
-		while inotifywait -e modify,create,delete -r chapters paper.tex paper.bib 2>/dev/null; do \
-			echo "ファイル変更を検知しました。コンパイルを開始します..."; \
-			retry_count=0; \
-			while [ $$retry_count -lt 3 ]; do \
-				if $(MAKE) paper.pdf; then \
-					echo "コンパイルに成功しました"; \
-					break; \
-				else \
-					retry_count=$$((retry_count + 1)); \
-					echo "[ERROR] コンパイルに失敗しました (試行 $$retry_count/3)"; \
-					if [ $$retry_count -lt 3 ]; then \
-						echo "クリーンアップして再試行します..."; \
-						$(MAKE) clean-all; \
-						sleep 1; \
-					else \
-						echo "[ERROR] 3回試行しましたが失敗しました。ファイル監視を継続します。"; \
-					fi; \
-				fi; \
-			done; \
-		done; \
-	else \
-		last_time=$$(find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
-			xargs stat -f "%m" 2>/dev/null | sort -n | tail -1 || \
-			find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
-			xargs stat -c "%Y" 2>/dev/null | sort -n | tail -1 || echo 0); \
-		while true; do \
-			current_time=$$(find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
-				xargs stat -f "%m" 2>/dev/null | sort -n | tail -1 || \
-				find chapters paper.tex paper.bib -type f \( -name "*.tex" -o -name "*.bib" \) 2>/dev/null | \
-				xargs stat -c "%Y" 2>/dev/null | sort -n | tail -1 || echo 0); \
-			if [ "$$current_time" != "$$last_time" ]; then \
-				echo "ファイル変更を検知しました。コンパイルを開始します..."; \
-				retry_count=0; \
-				while [ $$retry_count -lt 3 ]; do \
-					if $(MAKE) paper.pdf; then \
-						echo "コンパイルに成功しました"; \
-						break; \
-					else \
-						retry_count=$$((retry_count + 1)); \
-						echo "[ERROR] コンパイルに失敗しました (試行 $$retry_count/3)"; \
-						if [ $$retry_count -lt 3 ]; then \
-							echo "クリーンアップして再試行します..."; \
-							$(MAKE) clean-all; \
-							sleep 1; \
-						else \
-							echo "[ERROR] 3回試行しましたが失敗しました。ファイル監視を継続します。"; \
-						fi; \
-					fi; \
-				done; \
-				last_time=$$current_time; \
-			fi; \
-			sleep 1; \
-		done; \
-	fi
+	@echo "Compiling $(MAIN_TEX)..."
+	@$(LATEX_CMD)
+	@$(DOCKER_PREFIX) bash -c "cd $(WORKSPACE_DIR) && if [ -f build/$(OUTPUT_PDF) ]; then cp build/$(OUTPUT_PDF) $(OUTPUT_PDF) && echo 'PDF copied to root: $(OUTPUT_PDF)'; fi"
+
+watch-chapters: ## chapters/ 内のファイル変更を監視してコンパイル
+	$(call kill_watch_processes)
+	@mkdir -p build
+	@echo "watching: chapters/**/*.tex (auto-detecting best method for your environment)"
+	@$(WATCH_CMD)
 
 clean: ## LaTeX 中間ファイルを削除
-	@for tex in $(TEX_FILES); do \
-		echo "中間ファイル削除中: $$tex"; \
-		$(LATEX_CLEAN) $$tex; \
-	done
-	@if [ -f paper.tex ]; then \
-		echo "paper.texの中間ファイルを削除中..."; \
-		$(DOCKER_PREFIX) bash -c "cd /workspace && latexmk -c paper.tex" || \
-		bash -c "cd /workspace && latexmk -c paper.tex" || true; \
-	fi
-	$(RM_CMD) pdf/* paper.pdf
+	@echo "中間ファイル削除中..."
+	@$(LATEX_CLEAN)
 
 clean-all: ## すべての LaTeX 生成ファイルを削除
-	@for tex in $(TEX_FILES); do \
-		echo "生成ファイル完全削除中: $$tex"; \
-		$(LATEX_CLEAN_ALL) $$tex; \
-	done
-	@if [ -f paper.tex ]; then \
-		echo "paper.texの生成ファイルを完全削除中..."; \
-		$(DOCKER_PREFIX) bash -c "cd /workspace && latexmk -C paper.tex" || \
-		bash -c "cd /workspace && latexmk -C paper.tex" || true; \
-	fi
-	$(RM_CMD) pdf/* build/* paper.pdf
+	@echo "生成ファイル完全削除中..."
+	@$(LATEX_CLEAN_ALL)
+	@$(DOCKER_PREFIX) rm -rf build/*
 
-# Docker 関連コマンド実行時の実行環境チェック
-# devcontainer 下で docker コマンドを実行できないので、その場合は警告文を表示して終了する
-check_docker_cmd = @if [ "$(IN_DEVCONTAINER)" = "1" ]; then \
-	echo "[ERROR] Dev Container 環境では Docker 関連コマンドは使用できません"; \
-	exit 1; \
-fi
+# ヘルパー関数: Docker環境チェック
+define check_docker_env
+	@if [ "$(IN_DEVCONTAINER)" = "1" ]; then \
+		echo "[ERROR] Dev Container 環境では Docker 関連コマンドは使用できません"; \
+		exit 1; \
+	fi
+endef
+
+# ヘルパー関数: 環境別メッセージ表示
+define show_env_message
+	@if [ "$(IN_DEVCONTAINER)" = "1" ]; then \
+		echo "[INFO] Dev Container 環境では $(1) は不要です。"; \
+		echo "以下のコマンドでコンパイルできます:"; \
+		echo "  make compile  # src 下の .tex ファイルをコンパイル"; \
+		echo "  make watch   # ファイルの変更を監視してコンパイル"; \
+	else \
+		$(2); \
+	fi
+endef
 
 # Docker 関連コマンド
 build: ## Docker イメージをビルド
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	docker compose build
 
 up: ## コンテナを起動（バックグラウンド）
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	docker compose up -d
 
 down: ## コンテナを停止・削除
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	docker compose down
 
 exec: ## コンテナに接続
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	docker compose exec latex bash
 
 stop: ## コンテナを停止
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	docker compose stop
 
 logs: ## コンテナのログを表示
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	docker compose logs -f latex
 
 # 開発用コマンド
 setup: ## 初回セットアップ (ビルド + 起動)
-	@if [ "$(IN_DEVCONTAINER)" = "1" ]; then \
-		echo "[INFO] Dev Container 環境では make setup による初回セットアップは不要です。"; \
-		echo "以下のコマンドでコンパイルできます:"; \
-		echo "  make  # paper.texをコンパイルしてchapters内のファイル変更を監視"; \
-		echo "  make watch-chapters  # chapters内のファイル変更を監視してコンパイル"; \
-	else \
-		make build up; \
-		echo "環境構築を完了しました。以下のコマンドでコンパイルできます:"; \
-		echo "  make  # paper.texをコンパイルしてchapters内のファイル変更を監視"; \
-		echo "  make watch-chapters  # chapters内のファイル変更を監視してコンパイル"; \
-	fi
+	$(call show_env_message,make setup による初回セットアップ,make build up && echo "環境構築を完了しました。以下のコマンドでコンパイルできます:" && echo "  make paper.pdf      # paper.tex をコンパイル" && echo "  make watch-chapters # chapters/ の変更を監視してコンパイル")
 
-dev: ## 開発モード (起動 + 監視コンパイル)
+dev: ## 開発モード (起動 + chapters 監視コンパイル)
 	@if [ "$(IN_DEVCONTAINER)" = "1" ]; then \
 		echo "[WARNING] Dev Container 環境では make up は不要です。make watch-chapters を実行します"; \
 		make watch-chapters; \
@@ -287,19 +156,17 @@ dev: ## 開発モード (起動 + 監視コンパイル)
 	fi
 
 restart: ## コンテナを再起動
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	@make down up
 
 rebuild: ## 完全に再ビルド
-	$(check_docker_cmd)
+	$(call check_docker_env)
 	@make down build up
 
 # ファイル操作
 open-pdf: ## 生成されたPDFを開く（Mac用）
-	@if [ -f paper.pdf ]; then \
-		open paper.pdf; \
-	elif [ -f build/sample.pdf ]; then \
-		open build/sample.pdf; \
+	@if [ -f $(OUTPUT_PDF) ]; then \
+		open $(OUTPUT_PDF); \
 	else \
-		echo "PDFファイルが見つかりません。先に make を実行してください。"; \
+		echo "PDFファイルが見つかりません。先に make paper.pdf を実行してください。"; \
 	fi
