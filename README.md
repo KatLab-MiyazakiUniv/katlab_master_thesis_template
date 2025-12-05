@@ -135,8 +135,11 @@ katlab_master_thesis_template/
 │   └── 08-acknowledgments.tex
 ├── images/             # 画像ファイル
 │   └── *.png, *.jpg など
-└── packages/           # カスタム LaTeX パッケージ
-    └── *.sty
+├── packages/           # カスタム LaTeX パッケージ
+│   └── *.sty
+└── scripts/            # 便利なスクリプト
+    ├── watch.sh        # ファイル監視スクリプト
+    └── sync-template.sh # テンプレート同期スクリプト
 ```
 
 ## 論文の構成
@@ -162,6 +165,59 @@ katlab_master_thesis_template/
 - **hyperref**: ハイパーリンク機能
 - **listings**: ソースコード挿入
 - その他、TeX Live に含まれる標準パッケージ
+
+## テンプレートからの更新を取り込む
+
+このリポジトリをテンプレートとして使用して作成した派生リポジトリで、元のテンプレートの更新を取り込む方法を説明する。
+
+### 1. 同期スクリプトを使用（推奨）
+
+最も簡単な方法は、同梱されている同期スクリプトを使用すること：
+
+```bash
+bash scripts/sync-template.sh
+```
+
+スクリプトを実行すると、以下の操作が行われる：
+
+1. テンプレートリポジトリの最新情報を取得
+2. 現在のリポジトリとの差分を表示
+3. 同期方法を選択（マージ / リベース / 差分確認のみ）
+4. 選択した方法で更新を取り込む
+
+**推奨事項：**
+- 作業ディレクトリに未コミットの変更がないことを確認してから実行すること
+- 更新を取り込む前に、必ず現在の作業をコミットしておくこと
+
+### 2. 手動で同期する方法
+
+スクリプトを使わずに手動で同期することもできる：
+
+```bash
+# テンプレートリポジトリを remote として追加
+git remote add template https://github.com/KatLab-MiyazakiUniv/katlab_master_thesis_template.git
+
+# テンプレートの最新情報を取得
+git fetch template
+
+# テンプレートの更新を現在のブランチにマージ
+git merge template/main --allow-unrelated-histories
+
+# コンフリクトがあれば解決してコミット
+git add .
+git commit -m "Sync from template"
+
+# リモートにプッシュ
+git push origin main
+```
+
+### 3. 定期的な更新の推奨
+
+テンプレートの改善や新機能が追加されることがあるため、定期的に更新を確認することを推奨する：
+
+- 新しいプロジェクトを開始する前
+- テンプレートに重要な修正があった際
+- 月に1回程度の定期チェック
 
 ## 不具合対処
 
