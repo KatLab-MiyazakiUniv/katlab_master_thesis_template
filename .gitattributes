@@ -1,0 +1,17 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Makefile should use LF
+Makefile text eol=lf
+
+# LaTeX files should use LF
+*.tex text eol=lf
+*.sty text eol=lf
+*.bib text eol=lf
+
+# README and scripts should use LF
+README.md text eol=lf
+scripts/* text eol=lf
+
+# latexmkrc should use LF
+.latexmkrc text eol=lf
