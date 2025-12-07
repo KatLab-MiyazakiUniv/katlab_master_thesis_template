@@ -100,15 +100,37 @@ echo ""
 case "$SYNC_METHOD" in
   1)
     log_info "マージを実行します..."
-    if git merge "$TEMPLATE_REMOTE/$TEMPLATE_BRANCH" --no-edit; then
+    if git merge "$TEMPLATE_REMOTE/$TEMPLATE_BRANCH" --allow-unrelated-histories --no-edit; then
       log_success "テンプレートの更新をマージしました"
       log_info "以下のコマンドで push できます："
       echo "  git push origin $CURRENT_BRANCH"
     else
+      echo ""
       log_error "マージでコンフリクトが発生しました"
-      log_info "コンフリクトを解決してから以下を実行してください："
-      echo "  git add <解決したファイル>"
-      echo "  git commit"
+      echo ""
+
+      # コンフリクトファイルの表示
+      log_info "コンフリクトが発生したファイル："
+      git diff --name-only --diff-filter=U | while read -r file; do
+        echo "  - $file"
+      done
+      echo ""
+
+      # git status の表示
+      log_info "現在の状態："
+      git status
+      echo ""
+
+      # 解決手順の表示
+      log_info "次の手順でコンフリクトを解決してください："
+      echo ""
+      echo "  1. エディタで上記のファイルを開く"
+      echo "  2. <<<<<<< HEAD, =======, >>>>>>> のマーカーを探す"
+      echo "  3. どちらの変更を残すか選択して編集"
+      echo "  4. 解決したファイルをステージング: git add <ファイル名>"
+      echo "  5. マージをコミット: git commit"
+      echo ""
+      log_warn "マージを中止する場合: git merge --abort"
       exit 1
     fi
     ;;
@@ -120,12 +142,32 @@ case "$SYNC_METHOD" in
       log_info "以下のコマンドで push できます（force push が必要）："
       echo "  git push origin $CURRENT_BRANCH --force-with-lease"
     else
+      echo ""
       log_error "リベースでコンフリクトが発生しました"
-      log_info "コンフリクトを解決してから以下を実行してください："
-      echo "  git add <解決したファイル>"
-      echo "  git rebase --continue"
-      log_info "リベースをキャンセルする場合："
-      echo "  git rebase --abort"
+      echo ""
+
+      # コンフリクトファイルの表示
+      log_info "コンフリクトが発生したファイル："
+      git diff --name-only --diff-filter=U | while read -r file; do
+        echo "  - $file"
+      done
+      echo ""
+
+      # git status の表示
+      log_info "現在の状態："
+      git status
+      echo ""
+
+      # 解決手順の表示
+      log_info "次の手順でコンフリクトを解決してください："
+      echo ""
+      echo "  1. エディタで上記のファイルを開く"
+      echo "  2. <<<<<<< HEAD, =======, >>>>>>> のマーカーを探す"
+      echo "  3. どちらの変更を残すか選択して編集"
+      echo "  4. 解決したファイルをステージング: git add <ファイル名>"
+      echo "  5. リベースを続行: git rebase --continue"
+      echo ""
+      log_warn "リベースを中止する場合: git rebase --abort"
       exit 1
     fi
     ;;
