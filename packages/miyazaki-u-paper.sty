@@ -134,19 +134,34 @@
 %\def\cource{\def\@cource}
 \def\department{\def\@department}
 
-\degree{g}
+% 令和年度を自動計算
+\newcount\reiwaYear
+\newcount\currentYear
+\currentYear=\year
+\ifnum\month<4 % 1-3月の場合は前年度
+  \advance\currentYear by -1
+\fi
+\reiwaYear=\currentYear
+\advance\reiwaYear by -2018 % 2019年度 = 令和元年度
+
+\degree{} % 卒論の場合はg、修論の場合はm を paper.tex で指定しているはず
 \figurenumbering{f} % 図の目次をつける場合はt
 \tablenumbering{f} % 表の目次をつける場合はt
 \title{論文のタイトル}
 \author{名前}
-\major{情報通信プログラム}
-\nendo{\null}
+% \majorを動的に評価されるマクロとして定義
+\def\@major{%
+\if \@degree g 工学科 情報通信工学プログラム % 卒論の場合
+\else 工学専攻 先端情報コース % 修論の場合
+\fi}
+\nendo{\the\reiwaYear} % 令和年度を自動計算
 \advisor{指導教官の名前}
 %\cource{講座名}
-\department{
-  \if \@degree g {宮崎大学 工学部 \@major} % 卒論の場合
-  \else {宮崎大学大学院 工学研究科 \@major} % 修論の場合
-  \fi}
+% \departmentを動的に評価されるマクロとして定義
+\def\@department{%
+\if \@degree g 宮崎大学 工学部 \@major % 卒論の場合
+\else 宮崎大学大学院 工学研究科 \@major % 修論の場合
+\fi}
 \def\@acknowledgmentname{謝辞}
 \def\@appendixname{付録}
 \def\@listoffigures{図目次}
@@ -213,7 +228,7 @@
  \typeout{表紙}
 \thispagestyle{empty}
 \begin{center}
-{\LARGE 平成 \@nendo 年度 卒業論文 \par}\vskip 2em minus 1em
+{\LARGE 令和 \@nendo 年度 卒業論文 \par}\vskip 2em minus 1em
 {\huge\textbf{\@title}\par}\vskip 20em minus 4em
 {\Large 指導教員 \hskip 1em \@advisor\par}\vskip 3em minus 2em
 %
